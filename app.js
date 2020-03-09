@@ -10,7 +10,7 @@ const carboneRenderer = require('./lib/carbone-render');
 const cacheDir = process.env.CACHE_DIR || '/tmp/carbone-files';
 
 const upload = require(`multer`)({dest: cacheDir});
-const fileCache = new FileCache({cachePath: cacheDir});
+const fileCache = new FileCache({fileCachePath: cacheDir});
 
 const app = express();
 app.use(bodyParser.json());
