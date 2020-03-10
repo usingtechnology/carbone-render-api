@@ -60,7 +60,7 @@ const renderTemplate = async (template, req, res) => {
     return res.send(output.report);
 };
 
-const getFromCache = async(hash, hashHeaderName, download, res) => {
+const getFromCache = async (hash, hashHeaderName, download, res) => {
     const file = fileCache.find(hash);
     if (!file.success) {
         return res.status(file.errorType).send(file.errorMsg);
@@ -81,7 +81,7 @@ const getFromCache = async(hash, hashHeaderName, download, res) => {
     return res.sendStatus(200);
 };
 
-const deleteFromCache = async(hash, res) => {
+const deleteFromCache = async (hash, res) => {
     const file = await fileCache.remove(hash);
     if (!file.success) {
         return res.status(file.errorType).send(file.errorMsg);
@@ -89,7 +89,7 @@ const deleteFromCache = async(hash, res) => {
     return res.sendStatus(200);
 };
 
-const findAndRender = async(hash, req, res) => {
+const findAndRender = async (hash, req, res) => {
     const template = fileCache.find(hash);
     if (!template.success) {
         return res.status(template.errorType).send(template.errorMsg);
