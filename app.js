@@ -7,10 +7,10 @@ const mime = require('mime-types');
 const FileCache = require('./lib/file-cache');
 const carboneRenderer = require('./lib/carbone-render');
 
-const cacheDir = process.env.CACHE_DIR || '/tmp/carbone-files';
+const CACHE_DIR = process.env.CACHE_DIR || '/tmp/carbone-files';
 
-const upload = require(`multer`)({dest: cacheDir});
-const fileCache = new FileCache({fileCachePath: cacheDir});
+const upload = require(`multer`)({dest: CACHE_DIR});
+const fileCache = new FileCache({fileCachePath: CACHE_DIR});
 
 const app = express();
 app.use(bodyParser.json());
@@ -52,11 +52,54 @@ const renderTemplate = async (template, req, res) => {
     res.setHeader('X-Report-Name', output.reportName);
     res.setHeader('X-Template-Hash', template.hash);
 
+    const rendered = await fileCache.write(output.report, output.reportName, 'binary');
+    if (rendered.success) {
+        res.setHeader('X-Report-Hash', rendered.hash);
+    }
+
     return res.send(output.report);
 };
 
+const getFromCache = async(hash, hashHeaderName, download, res) => {
+    const file = fileCache.find(hash);
+    if (!file.success) {
+        return res.status(file.errorType).send(file.errorMsg);
+    }
+    res.setHeader(hashHeaderName, file.hash);
+    if (download) {
+        try {
+            const cached = await fileCache.read(hash);
+            res.setHeader('Content-Disposition', `attachment; filename=${file.name}`);
+            res.setHeader('Content-Transfer-Encoding', 'binary');
+            res.setHeader('Content-Type', mime.contentType(path.extname(file.name)));
+            res.setHeader('Content-Length', cached.length);
+            return res.send(cached);
+        } catch (e) {
+            return res.status(500).send(e.message);
+        }
+    }
+    return res.sendStatus(200);
+};
+
+const deleteFromCache = async(hash, res) => {
+    const file = await fileCache.remove(hash);
+    if (!file.success) {
+        return res.status(file.errorType).send(file.errorMsg);
+    }
+    return res.sendStatus(200);
+};
+
+const findAndRender = async(hash, req, res) => {
+    const template = fileCache.find(hash);
+    if (!template.success) {
+        return res.status(template.errorType).send(template.errorMsg);
+    } else {
+        return await renderTemplate(template, req, res);
+    }
+};
+
 app.post('/template', upload.single('template'), async (req, res) => {
-    console.log('template upload');
+    console.log('Template upload');
     console.log(req.file);
 
     const result = await fileCache.move(req.file.path, req.file.originalname);
@@ -69,7 +112,7 @@ app.post('/template', upload.single('template'), async (req, res) => {
 });
 
 app.post('/template/render', async (req, res) => {
-    console.log('TEMPLATE UPLOAD/RENDER');
+    console.log('Template upload and render');
     //console.log(req.body);
 
     let template = {};
@@ -82,48 +125,49 @@ app.post('/template/render', async (req, res) => {
         return res.status(400).send(e.message);
     }
 
+    // let the caller determine if they want to overwrite the template
+    //
+    const options = req.body.options || {};
+    const overwrite = options.overwrite ? (options.overwrite === "true" || options.overwrite === true || options.overwrite === 1) : false;
     // write to disk...
-    const content = await fileCache.write(template.content, template.fileType, template.encodingType);
+    const content = await fileCache.write(template.content, template.fileType, template.encodingType, {overwrite: overwrite});
     if (!content.success) {
         return res.status(content.errorType).send(content.errorMsg);
     }
 
-    const cacheTemplate = fileCache.find(content.hash);
-    if (!cacheTemplate.success) {
-        return res.status(cacheTemplate.errorType).send(cacheTemplate.errorMsg);
-    }
-    return await renderTemplate(cacheTemplate, req, res);
+    return await findAndRender(content.hash, req, res);
 });
 
 app.post('/template/:uid/render', async (req, res) => {
-    console.log('TEMPLATE RENDER');
-    console.log(req.body);
-
-    const template = fileCache.find(req.params.uid);
-    if (!template.success) {
-        return res.status(template.errorType).send(template.errorMsg);
-    } else {
-        return await renderTemplate(template, req, res);
-    }
+    const hash = req.params.uid;
+    console.log(`Template render ${hash}.`);
+    return await findAndRender(hash, req, res);
 });
 
 app.get('/template/:uid', async (req, res) => {
-    console.log('template check');
-    const template = fileCache.find(req.params.uid);
-    if (!template.success) {
-        return res.status(template.errorType).send(template.errorMsg);
-    }
-    res.setHeader('X-Template-Hash', template.hash);
-    return res.sendStatus(200);
+    const hash = req.params.uid;
+    const download = req.query.download !== undefined;
+    const hashHeaderName = 'X-Template-Hash';
+    console.log(`Get Template ${hash}. Download = ${download}`);
+    return await getFromCache(hash, hashHeaderName, download, res);
 });
 
 app.delete('/template/:uid', async (req, res) => {
-    console.log('template check');
-    const template = await fileCache.remove(req.params.uid);
-    if (!template.success) {
-        return res.status(template.errorType).send(template.errorMsg);
-    }
-    return res.sendStatus(200);
+    console.log(`Delete template: ${uid}`);
+    return await deleteFromCache(req, res);
+});
+
+app.get('/render/:uid', async (req, res) => {
+    const hash = req.params.uid;
+    const download = req.query.download !== undefined;
+    const hashHeaderName = 'X-Report-Hash';
+    console.log(`Get Rendered report ${hash}. Download = ${download}`);
+    return await getFromCache(hash, hashHeaderName, download, res);
+});
+
+app.delete('/render/:uid', async (req, res) => {
+    console.log(`Delete rendered report: ${uid}`);
+    return await deleteFromCache(req, res);
 });
 
 carboneRenderer.startFactory();
