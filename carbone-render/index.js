@@ -1,13 +1,13 @@
-const arrayFilter = require('lodash._arrayfilter');
 const carbone = require('carbone');
 const fs = require('fs-extra');
 const path = require('path');
+const {v4: uuidv4} = require('uuid');
 
 const asyncRender = async (template, data, options) => {
     return new Promise(((resolve, reject) => {
         carbone.render(template, data, options, (err, result, reportName) => {
             if (err) {
-                reject(`Error during Carbone generation. Error: ${err}`);
+                reject(err);
             } else {
                 resolve({report: result, reportName: reportName});
             }
@@ -79,9 +79,29 @@ module.exports.fileTypes = {
     ]
 };
 
-module.exports.startFactory = () => {
-    carbone.set({startFactory: true})
+// initialize carbone formatters, add a marker to indicate defaults...
+// unfortunately carbone is a singleton and we cannot set formatters for each render call,
+const DEFAULT_CARBONE_FORMATTERS = Object.freeze(Object.assign({}, carbone.formatters));
+
+const addFormatters = formatters => {
+    if (Object.keys(formatters).length) {
+        carbone.formatters = Object.assign({}, DEFAULT_CARBONE_FORMATTERS);
+        carbone.addFormatters(formatters);
+        return true;
+    }
+    return false;
 };
+
+const resetFormatters = reset => {
+    if (reset) {
+        carbone.formatters = Object.assign({}, DEFAULT_CARBONE_FORMATTERS);
+    }
+};
+
+module.exports.startFactory = () => {
+    carbone.set({startFactory: true});
+};
+
 
 module.exports.render = async (template, data = {}, options = {}, formatters = {}) => {
     const result = {success: false, errorType: null, errorMsg: null, reportName: null, report: null};
@@ -99,15 +119,20 @@ module.exports.render = async (template, data = {}, options = {}, formatters = {
 
     // some defaults if options not set...
     if (!options.convertTo || !options.convertTo.trim().length) {
+        // set convert to template type (no conversion)
         options.convertTo = path.extname(template).slice(1);
     }
     if (!options.reportName || !options.reportName.trim().length) {
-        options.reportName = `${path.parse(template).name}.${options.convertTo}`;
+        // no report name, set to UUID
+        options.reportName = `${uuidv4()}.${options.convertTo}`;
     }
 
-    carbone.formatters = arrayFilter(carbone.formatters, (formatter) => formatter.$isDefault === true);
-    carbone.addFormatters(formatters);
+    // ensure the reportName has the same extension as the convertTo...
+    if (options.convertTo !== path.extname(options.reportName).slice(1)) {
+        options.reportName = `${path.parse(options.reportName).name}.${options.convertTo}`;
+    }
 
+    let reset = addFormatters(formatters);
     try {
         const renderResult = await asyncRender(template, data, options);
         result.report = renderResult.report;
@@ -116,7 +141,7 @@ module.exports.render = async (template, data = {}, options = {}, formatters = {
     } catch (e) {
         result.errorType = 500;
         result.errorMsg = `Could not render template. ${e.message}`;
-        return result;
     }
+    resetFormatters(reset);
     return result;
 };

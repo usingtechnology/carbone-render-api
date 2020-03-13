@@ -1,11 +1,11 @@
 const bytes = require('bytes');
 const fs = require('fs');
 const Problem = require('api-problem');
+const telejson = require('telejson');
 const tmp = require('tmp');
 const validator = require('validator');
 
-const carboneRenderer = require('./lib/carbone-render');
-const fileTypes = carboneRenderer.fileTypes;
+const fileTypes = require('../carbone-render').fileTypes;
 
 const handleValidationErrors = (res, next, errors) => {
     if (errors && errors.length) {
@@ -62,10 +62,10 @@ const models = {
             return true;
         },
 
-        // formatters is optional, but must be an object
+        // formatters is optional, but must be an string
         formatters: value => {
             if (value) {
-                return validatorUtils.isObject(value);
+                return validatorUtils.isNonEmptyString(value);
             }
             return true;
         },
@@ -180,6 +180,14 @@ const modelValidation = {
         }
         if (!models.carbone.formatters(obj.formatters)) {
             errors.push({value: obj.formatters, message: 'Invalid value `formatters`.'});
+        } else {
+            if (obj.formatters) {
+                try {
+                    telejson.parse(obj.formatters, {allowFunction: true});
+                } catch (e) {
+                    errors.push({value: obj.formatters, message: 'Formatters could not be parsed into formatters object. See \'https://www.npmjs.com/package/telejson\'.'});
+                }
+            }
         }
         return errors;
     },

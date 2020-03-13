@@ -2,7 +2,7 @@ const docs = {
     getDocHTML: version => `<!DOCTYPE html>
   <html>
     <head>
-      <title>Document Generation API - Documentation ${version}</title>
+      <title>Carbone Copy API - Documentation ${version}</title>
       <!-- needed for adaptive design -->
       <meta charset="utf-8"/>
       <meta name="viewport" content="width=device-width, initial-scale=1">

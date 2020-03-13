@@ -13,27 +13,27 @@ let maxFileCount = 1;
 module.exports = {
 
     init(options) {
-        const fileUploadsDir = options && (options.fileUploadsDir || options['file-uploads-dir']) || process.env.FILE_UPLOADS_DIR || fs.realpathSync(os.tmpdir());
+        const fileUploadsDir = (options && options.fileUploadsDir) || process.env.FILE_UPLOADS_DIR || fs.realpathSync(os.tmpdir());
         try {
             fs.ensureDirSync(fileUploadsDir);
         } catch (e) {
             throw new Error(`Could not create file uploads directory '${fileUploadsDir}'.`);
         }
-        maxFileSize = options && (options.maxFileSize || options['max-file-size']) || process.env.FILE_UPLOADS_MAX_FILE_SIZE || '25MB';
+        maxFileSize = (options && options.maxFileSize) || process.env.FILE_UPLOADS_MAX_FILE_SIZE || '25MB';
         try {
             maxFileSize = bytes.parse(maxFileSize);
         } catch (e) {
             throw new Error('Could not determine max file size (bytes) for file uploads.');
         }
 
-        maxFileCount = options && (options.maxFileCount || options['max-file-count']) || process.env.FILE_UPLOADS_MAX_FILE_COUNT || '1';
+        maxFileCount = (options && options.maxFileCount) || process.env.FILE_UPLOADS_MAX_FILE_COUNT || '1';
         try {
             maxFileCount = parseInt(maxFileCount);
         } catch (e) {
             maxFileCount = 1;
         }
 
-        const formFieldName = options && (options.formFieldName || options['form-field-name']) || process.env.FILE_UPLOADS_FORM_FIELD || 'files';
+        const formFieldName = (options && options.formFieldName) || process.env.FILE_UPLOADS_FORM_FIELD || 'files';
 
         storage = multer.diskStorage({
             destination: function (req, file, cb) {

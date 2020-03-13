@@ -7,7 +7,7 @@ const {v4: uuidv4} = require('uuid');
 class FileCache {
 
     constructor(options) {
-        this._cachePath = options && (options.fileCachePath || options['file-cache-path']) || process.env.FILE_CACHE_PATH || fs.realpathSync(os.tmpdir());
+        this._cachePath = (options && options.fileCachePath) || process.env.FILE_CACHE_PATH || fs.realpathSync(os.tmpdir());
         // ensure no trailing path separator.
         if (this._cachePath.endsWith(path.sep)) {
             this._cachePath = this._cachePath.slice(0, -1);
@@ -16,9 +16,9 @@ class FileCache {
         try {
             fs.ensureDirSync(this._cachePath);
         } catch (e) {
-            throw new Error(`Could not create cache directory '${this._cachePath}'.`);
+            throw new Error(`Could not access cache directory '${this._cachePath}'.`);
         }
-
+        //private helper functions.
         this._getHash = async (file) => {
             const hash = crypto.createHash('sha256');
             const stream = fs.createReadStream(file);
@@ -32,8 +32,7 @@ class FileCache {
                 stream.on("end", () => resolve(hash.digest('hex')));
                 stream.on("error", error => reject(error));
             });
-        }
-
+        };
         this._getHashPath = hash => `${this._cachePath}${path.sep}${hash}`;
         this._getTempFilePath = () => `${this._cachePath}${path.sep}${uuidv4()}`;
     }
@@ -179,7 +178,6 @@ class FileCache {
         }
         return result;
     }
-
 }
 
 module.exports = FileCache;
